@@ -19,7 +19,8 @@ import UIKit
     @IBInspectable public var menuBackGroundColor: UIColor = UIColor(white: 36/255, alpha: 1) {
         didSet {
             menuLayers.forEach {
-                $0.fillColor = menuBackGroundColor.cgColor
+                $0.fillColor = UIColor.clear.cgColor
+                // $0.fillColor = menuBackGroundColor.cgColor
             }
         }
     }
@@ -42,6 +43,7 @@ import UIKit
     }
 
     fileprivate(set) var menuLayers = [MenuLayer]()
+    fileprivate(set) var menuViews = [CircleImageView]()
     
     private(set) lazy var menuBaseView: UIView = {
         UIView()
@@ -110,16 +112,19 @@ public extension WheelMenuView {
         }
         set {
             menuLayers.forEach{ $0.removeFromSuperlayer() }
+            menuViews.forEach { $0.removeFromSuperview() }
             
             let angle = 2 * CGFloat.pi / CGFloat(newValue.count)
             let firstItemAngle = CGFloat.pi/2
             
-            menuLayers = newValue.enumerated().map {
-                let startAngle = CGFloat($0.offset) * angle - angle / 2 - firstItemAngle
-                let endAngle   = CGFloat($0.offset + 1) * angle - angle / 2 - (CGFloat.pi/2) - 0.005
+            var layers = [MenuLayer]()
+            var views = [CircleImageView]()
+            for item in newValue.enumerated() {
+                let startAngle = CGFloat(item.offset) * angle - angle / 2 - firstItemAngle
+                let endAngle   = CGFloat(item.offset + 1) * angle - angle / 2 - firstItemAngle - 0.005
                 let center     = CGPoint(x: bounds.width/2, y: bounds.height/2)
                 
-                var transform = CATransform3DMakeRotation(angle * CGFloat($0.offset), 0, 0, 1)
+                var transform = CATransform3DMakeRotation(angle * CGFloat(item.offset), 0, 0, 1)
                 transform = CATransform3DTranslate(transform, 0, -bounds.width/3, 0)
                 
                 let layer = MenuLayer(
@@ -127,19 +132,31 @@ public extension WheelMenuView {
                     radius: bounds.width/2,
                     startAngle: startAngle,
                     endAngle: endAngle,
-                    tabBarItem: $0.element,
+                    tabBarItem: item.element,
                     bounds: bounds,
                     contentsTransform: transform)
                 
                 layer.tintColor   = tintColor
                 layer.strokeColor = boarderColor.cgColor
+                
+                menuBackGroundColor = UIColor.clear
                 layer.fillColor   = menuBackGroundColor.cgColor
-                layer.selected    = $0.offset == selectedIndex
+                layer.selected    = item.offset == selectedIndex
                 
                 menuBaseView.layer.addSublayer(layer)
                 
-                return layer
+                let circleView = CircleImageView(frame: .zero)
+                circleView.frame.size = CGSize(width: 50, height: 50)
+                circleView.center = KHVector.circlePoint(distance: 5*bounds.width/12, angle: (startAngle+endAngle)/2, center: center)
+                
+                menuBaseView.addSubview(circleView)
+                
+                layers.append(layer)
+                views.append(circleView)
             }
+            
+            self.menuLayers = layers
+            self.menuViews = views
         }
     }
     
@@ -164,6 +181,9 @@ fileprivate extension WheelMenuView {
                 location.y - menuBaseView.center.y)
             
             menuBaseView.transform = menuBaseView.transform.rotated(by: radian2 - radian1)
+            menuViews.forEach { $0.transform = $0.transform.rotated(by: -(radian2 - radian1)) }
+            
+            print(radian2 - radian1)
             
             startPoint = location
         }
@@ -181,7 +201,11 @@ fileprivate extension WheelMenuView {
 
             UIView.animate(withDuration: TimeInterval(0.5)) { [unowned self] in
                 self.menuBaseView.transform = self.menuBaseView.transform.rotated(by: radian2 - radian1)
+                self.menuViews.forEach { $0.transform = $0.transform.rotated(by: -(radian2 - radian1)) }
+
             }
+            print(radian2 - radian1)
+
             startPoint = location
         }
         default:
